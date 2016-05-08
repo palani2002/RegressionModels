@@ -4,19 +4,353 @@ author: "Palani"
 date: "Saturday, May 07, 2016"
 output: html_document
 ---
+## Objective  
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Given the `Motor Trend`, data set of a collection of `cars`, interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). And particularly interested in the following two objectives:
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+* "Is an `automatic` or `manual` transmission better for MPG"
+* "Quantify the `MPG difference` between automatic and manual transmissions"
 
-```{r}
-summary(cars)
+## Introduction
+
+The data was extracted from the 1974 Motor Trend US magazine, and comprises `fuel consumption` and 10 aspects of automobile design and performance for 32 automobiles (1973-74 models).The  aspects of automobile design and performance are `Number of cyclinders` ,`Displacement `,`Gross horsepower`,`Rear axle ratio`,`Weight (lb/1000)`,`1/4 mile time`,`V/S`,`Transmission (0 = automatic, 1 = manual)`,
+`Number of forward gears`,`Number of carburetors`
+
+```{r,echo=FALSE}
+head(mtcars)
 ```
 
-You can also embed plots, for example:
-
-```{r, echo=FALSE}
-plot(cars)
+```{r,echo=FALSE}
+dim(mtcars)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r,echo=FALSE,results='hide'}
+str(mtcars)
+
+```
+
+## Executive Summary
+
+This project explores the relationship between miles-per-gallon (MPG) and other variables in the mtcars data set. In particular, the analysis attempts to determine whether an automatic or manual transmission is better for MPG, and quantifies the MPG difference.
+
+Exploratory section reveals univariate and bivariate analysis , which gives pre information before attempting to model.
+
+The Analysis section of this document focuses on inference with a simple linear regression model and a multiple regression model. Both models support the conclusion that the cars in this study with manual transmissions have on average significantly higher MPG's than cars with automatic transmissions.
+
+This conclusion holds whether we consider the relationship between MPG and transmission type alone or transmission type together with 2 other predictors: wt / weight; and qsec / 1/4 mile time.
+
+In the simple model, the mean MPG difference is 7.245 MPG; the average MPG for cars with automatic transmissions is 17.147 MPG. In the multiple regression model, the MPG difference is 2.9358 MPG at the mean weight and qsec.
+
+### Exploratory Data Analysis
+
+#### Univariate Analysis.
+
+**Unique Values**
+
+Based on unique values on each columns , confirming `cyl`,`vs`,`am`,`gear`,`carb` are `categorical` values
+
+```{r,echo=FALSE}
+sapply(mtcars, function(x) length(unique(x)))
+```
+
+
+**Density plot for `continous` variables.**
+
+Slight skewness present in `mpg` and `hp`
+
+```{r,echo=FALSE,message=FALSE}
+mtcars_num<-subset(mtcars,select=c(mpg,disp,hp,drat,wt))
+mtcars_num$s_n=1:32
+library(reshape2)
+meltedmtcars <- melt(mtcars_num, id.vars = "s_n")
+library(lattice)
+ densityplot(~value|variable, 
+            data = meltedmtcars, 
+             ## Adjust each axis so that the measurement scale is
+             ## different for each panel
+             scales = list(x = list(relation = "free"), 
+                           y = list(relation = "free")),
+             ## 'adjust' smooths the curve out
+             adjust = 1.25, 
+            ## change the symbol on the rug for each data point
+             pch = "|",
+             xlab = "Predictor")
+```
+
+**Skewness Metrics**
+
+All the numeric variables are almost normal .And there is no significant skewness present in the continous variables.
+
+```{r,echo=FALSE,message=FALSE}
+library(e1071)
+
+sapply(mtcars[c(1,3:7)],skewness)
+```
+
+**category variable distribution**
+
+The preferred attributes of MT cars are `8` cyclinder , `vertical engines` ,`Automatic Transmission`,`5 gear' and `2 and 4 carburreators'
+
+```{r,echo=FALSE,message=FALSE}
+library(gridExtra)
+counts1 = table(mtcars$cyl)
+library(ggplot2)
+library(lattice)
+
+p1<-barchart(Freq ~ Var1,
+         data = as.data.frame(counts1),
+         ylim = c(0, max(counts1)*1.1),
+         ylab = "Frequency",
+         xlab='Cylinder')
+
+counts2 = table(mtcars$vs)
+
+p2<-barchart(Freq ~ Var1,
+         data = as.data.frame(counts2),
+         ylim = c(0, max(counts2)*1.1),
+         ylab = "Frequency",
+         xlab = "vengine/straight engine")
+
+counts3 = table(mtcars$am)
+
+p3<-barchart(Freq ~ Var1,
+         data = as.data.frame(counts3),
+         ylim = c(0, max(counts3)*1.1),
+         ylab = "Frequency",
+         xlab = "Transmission")
+         
+         
+counts4 = table(mtcars$gear)
+
+p4<-barchart(Freq ~ Var1,
+         data = as.data.frame(counts4),
+         ylim = c(0, max(counts4)*1.1),
+         ylab = "Frequency",
+         xlab = "Gear")
+
+counts5 = table(mtcars$carb)
+
+p5<-barchart(Freq ~ Var1,
+         data = as.data.frame(counts5),
+         ylim = c(0, max(counts5)*1.1),
+         ylab = "Frequency",
+         xlab = "Number of carbureators")
+
+grid.arrange(p1, p2, p3, p4,p5,ncol=2)
+```
+
+#### Bi variate analysis 
+
+**MPG vs categoric variables** 
+
++ `2` ,`6` carbureators gives highest mpg 
++ `4` gear gives highest mpg
++ `manual` transmission gives highest mpg
++ `Straight` engine gives highest mpg
++ `4` cyclinder gives highest mpg
+
+
+```{r multiplots,echo=FALSE,message=FALSE,fig.width=8, fig.height=6}
+par(mfrow=c(3,2)) 
+boxplot( mtcars$mpg ~ mtcars$cyl,xlab='Cyclinder',ylab='MPG')
+boxplot( mtcars$mpg ~ mtcars$vs,xlab='vengine',ylab='MPG')
+boxplot( mtcars$mpg ~ mtcars$am,xlab='Transmission',ylab='MPG')
+boxplot( mtcars$mpg ~ mtcars$gear,xlab='gear',ylab='MPG')
+boxplot( mtcars$mpg ~ mtcars$carb,xlab='Number of carbureators',ylab='MPG')
+par(mfrow=c(1,1))
+
+```
+
+**corrplot for continous variables**
+
+There is a strong linear relationship between response `mpg` and `predictor` variables.  
+And there is cause of concern for predictor variables are correlated with each other, this violates the 
+independent predictor variable assumption of linear regression.
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+library(corrplot)
+M<-cor(mtcars[,c(1,3:6)])
+corrplot(M, method="circle")
+```
+
+**Loess smooth curve**
+The lowess smoother shows a non-parametric estimate of the fitted regression line  at each predictor value.
+This smooth curve is pre intimation of whether linear regression line is possible or not.
+And there is interesting fact is that all the continous variables have slightly curvilinear relationship
+with response `mpg`.
+
+```{r,echo=FALSE,results='hide'}
+# Function to return points and geom_smooth
+# allow for the method to be changed
+my_fn <- function(data, mapping, method="loess", ...){
+      p <- ggplot(data = data, mapping = mapping) + 
+      geom_point() + 
+      geom_smooth(method=method, ...)
+      p
+    }
+```
+
+
+
+```{r ,echo=FALSE,message=FALSE,warning=FALSE}
+
+# Default loess curve 
+library(GGally)
+library(ggplot2)
+ggpairs(mtcars, lower = list(continuous = my_fn))
+
+```
+
+### Linear Regression Model fitting
+
+```{r ,echo=FALSE,warning=FALSE}
+fit1 <- lm(mpg ~ factor(am), data = mtcars)
+summary(fit1)$coef
+```
+
+**coefficient interpretation**
++ Estimated mean of `automatic` transmission is 17.147 mpg
++ Therefore 7.244 is the estimated mean comparing `manual` transmission with `automatic` transmission.
+And the `am` variable is significant with regression variation `r summary(fit1)$adj.r.squared` and standard
+deviation around the regression line is `r summary(fit1)$sigma`.
+
+#### using full model
+
+```{r,echo=FALSE,warning=FALSE}
+
+fit2<-lm(mpg~factor(cyl)+disp+hp+drat+wt+qsec+factor(vs)+factor(am)+factor(gear)+factor(carb),data=mtcars)
+```
+* There is no significant variables and the huge standard errors due to that coefficients are inflated.
+Main reason could be the `collinearity` between the predictor variables.And the regression variation `r summary(fit2)$adj.r.squared` and standard deviation around the regression line is `r summary(fit2)$sigma`.
+
+#### Residual Diagnostics
+
+* The residual diagnostics help to identify whether the model is good fit or poor fit.
+
++ In the residual vs fitted there is a systamatic pattern in the residual 
++ In the qqplot there is a huge deviation from the diagonal in the upper part.
++ There is a outlier presence in the 28 and 29 th observation.
++ There is both combination of outlier and influence present in 28 and 29 th observation.
+```{r,echo=FALSE,warning=FALSE}
+par(mfrow=c(2,2)) 
+plot(fit2)
+par(mfrow=c(1,1)) 
+```
+
+**Evaluating hetroscedasticity**
+
+* There is  constant variation present in the residual but in syatamatic pattern ,that causes concern.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+library(car)
+ncvTest(fit2)
+```
+
+### Multiple Model Creation.
+
+#### Variable Selection
+
+##### Multi Collinearity Treatment
++ A predictor variable is having linear relationship between 2 or more more variables.
++ Variation inflation factor analysesn collinearity among variables
++ Greater than 2 considered are severe `Multi-Collinearity`
++ Displacement has high collinearity with other variables.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+library(car)
+vi<-vif(fit2) 
+# variance inflation factors 
+sqrt(vi) 
+```
+
+**Removing Variables**
+
+In the  process of removing variables such that the collinearity between predictor variables were reduced.
+In this first step , fitting a model without the displacement variable and  Re estimating the vif with 
+newly fitted model indicates `hp` as highest collinear variable.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+fit_vif<-lm(mpg~factor(cyl)+hp+drat+wt+qsec+factor(vs)+factor(am)+factor(gear)+factor(carb),data=mtcars)
+library(car)
+sqrt(vif(fit_vif)) 
+```
+
+*** Removing variable2**
+
+Similar process followed as like above by removing `hp` variable.The refitted model vif is in control.
+And the `variable selection` is ready for next modelling.
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+fit_vif2<-lm(mpg~factor(cyl)+drat+wt+qsec+factor(vs)+factor(am)+factor(gear)+factor(carb),data=mtcars)
+library(car)
+sqrt(vif(fit_vif2))
+```
+
+#### Automatic Model Selection.
+
++ Stepwise regression is used for automatic variable selection .
++ It includes both dackward and forward selection.
++ Non significant variables are thrown from the model
++ Due to the problem of step wise regression unability to handle Multi collinearity , treated  multi-collinearity in the last step.
+
+```{r echo=FALSE,message=FALSE}
+
+library(MASS)
+MultModel <- stepAIC(lm(mpg~factor(cyl)+drat+wt+qsec+factor(vs)+factor(am)+factor(gear)+factor(carb) ,data=mtcars), direction = 'both', trace = FALSE)
+summary(MultModel)$coef
+```
+
+**Non-Significant Variable**
+
+The following variables are thrown from model selection as the fact that they are insignificant.
+```{r,echo=FALSE}
+MultModel$anova[1:5]
+```
+
+#### The Final Model
+**coefficient interpretation**
++ We estimate an expected 3.91 mpg decrease in Miles for every 1000lb increase in weight , holding other variables constant.
++ we estimate an expected 1.22 mpg increase in Miles for every increase in  quarter mile time, holding other variables constant.
++ The increase in mpg estimated is 2.93 when comparing `manual` transmission with `automatic` transmission at the mean weight and qsec.
+
+
+```{r,echo=FALSE}
+fit3 <- lm(mpg ~ wt + qsec + am,data=mtcars)
+summary(finalModel)$coefficients
+```
+
+
+#3 Strategy for model selection
+
+Thus inclusion of `weight` and `qsec` increases the variance of the `mpg` effect by 64% while further interaction with weight and transmission  causes a 78% increase. 
+
+```{r,echo=FALSE,warning=FALSE}
+fit1<-lm(mpg ~ factor(am),data=mtcars)
+a <- summary(fit1)$cov.unscaled[2,2]
+fit3 <- update(fit, mpg ~ wt + qsec + factor(am),data=mtcars)
+fit4<- update(fit, mpg ~ wt + qsec + factor(am)+wt:factor(am),data=mtcars)
+c(summary(fit3)$cov.unscaled[2,2],
+    summary(fit4)$cov.unscaled[2,2]) / a
+```
+
+**Model Selection**
+
+Notice how the three models are nested. That is, Model 3 contains all of the Model 2 variables which contains all of the Model 1 variables. The P-values are for a test of whether all of the new variables are all zero or not (i.e. whether or not they're necessary). So this model would conclude that all of the added Model 2 terms are necessary over Model 3 and all of the Model 2 terms are necessary over Model 1. 
+
+```{r,echo=FALSE,message=FALSE}
+anova(fit1,fit3,fit4)
+```
+
+### Conclusion
+
+From the above analysis the manual transmission is better than automatic transmission .And the MPG difference
+between the manual and automatic transmission is 2.93 at the mean weight and qsec.
+
+
+
+
+
+
+
